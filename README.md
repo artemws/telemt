@@ -8,6 +8,10 @@
   - [Build](#build)
 - [How to use?](#how-to-use)
   - [Systemd Method](#telemt-via-systemd)
+- [FAQ](#faq)
+  - [Telegram Calls](#telegram-calls-via-mtproxy)
+  - [DPI](#how-does-dpi-see-mtproxy-tls)
+  - [Whitelist on Network Level](#whitelist-on-ip)
 - [Why Rust?](#why-rust)
 
 ## Features
@@ -62,6 +66,22 @@ WantedBy=multi-user.target
 4. In Shell type `systemctl status telemt` - there you can reach info about current MTProxy status
 5. In Shell type `systemctl enable telemt` - then telemt will start with system startup, after the network is up
 
+## FAQ
+### Telegram Calls via MTProxy
+- Telegram architecture does **NOT allow calls via MTProxy**, but only via SOCKS5, which cannot be obfuscated
+### How does DPI see MTProxy TLS?
+- DPI sees MTProxy in Fake TLS (ee) mode as TLS 1.3
+- the SNI you specify sends both the client and the server;
+- ALPN is similar to HTTP 1.1/2;
+- high entropy, which is normal for AES-encrypted traffic;
+### Whitelist on IP
+- MTProxy cannot work when there is: 
+  - no IP connectivity to the target host
+  - OR all TCP traffic is blocked
+  - OR all TLS traffic is blocked,
+- like most protocols on the Internet; 
+- this situation is observed in China behind the Great Chinese Firewall and in Russia on mobile networks
+
 ## Why Rust?
 - Long-running reliability and idempotent behavior
 - Rust’s deterministic resource management - RAII 
@@ -70,17 +90,18 @@ WantedBy=multi-user.target
 - Tokio's asynchronous architecture
 
 ## Roadmap
-- Zero-copy, minimal allocs on hotpath
+- Public IP in links
 - Config Reload-on-fly
-- No global mutable state
+- Bind to device or IP for outbound/inbound connections
+- Adtag Support per SNI / Secret
 - Fail-fast on start + Fail-soft on runtime (only WARN/ERROR)
-- Client isolation
+- Zero-copy, minimal allocs on hotpath
+- DC Healthchecks + global fallback
+- No global mutable state
+- Client isolation + Fair Bandwidth
 - Backpressure-aware IO
 - "Secret Policy" - SNI / Secret Routing :D
-- Adtag Support per SNI / Secret
-- DC Healthchecks + global fallback
 - Multi-upstream Balancer and Failover
-- Bind to device or IP for outbound/inbound connections
 - Strict FSM per handshake
 - Session-based Antireplay with Sliding window, non-broking reconnects
 - Web Control: statistic, state of health, latency, client experience...
