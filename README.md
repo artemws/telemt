@@ -64,7 +64,6 @@ Open nano
 ```bash
 nano /etc/telemt.toml
 ```
-then Ctrl+X -> Y -> Enter
 ```bash
 port = 443                              # Listening port
 
@@ -87,6 +86,8 @@ fast_mode = true                        # Use "fast" obfuscation variant
 client_keepalive = 600                  # Seconds
 client_ack_timeout = 300                # Seconds
 ```
+then Ctrl+X -> Y -> Enter to save
+
 **2. Create service on /etc/systemd/system/telemt.service**
 
 Open nano
