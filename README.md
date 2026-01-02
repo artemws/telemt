@@ -47,6 +47,29 @@ telemt config.toml
 ## How to use?
 ### Telemt via Systemd
 1. Place your config to /etc/telemt.toml
+```bash
+port = 443                              # Listening port
+
+[users]
+# ! Generate YOUR OWN secret with "openssl rand -hex 16", replace it instead 00000000000000000000000000000000 !
+hello = "00000000000000000000000000000000"
+
+[modes]
+classic = false                         # Plain obfuscated mode
+secure = false                          # dd-prefix mode
+tls = true                              # Fake TLS - ee-prefix
+
+tls_domain = "petrovich.ru"             # Domain for ee-secret and masking
+mask = true                             # Enable masking of bad traffic
+mask_host = "petrovich.ru"              # Optional override for mask destination
+mask_port = 443                         # Port for masking
+
+prefer_ipv6 = false                     # Try IPv6 DCs first if true
+fast_mode = true                        # Use "fast" obfuscation variant
+
+client_keepalive = 600                  # Seconds
+client_ack_timeout = 300                # Seconds
+```
 2. Create service on /etc/systemd/system/telemt.service
 ```bash
 [Unit]
