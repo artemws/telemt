@@ -46,7 +46,7 @@ telemt config.toml
 
 ## How to use?
 ### Telemt via Systemd
-0. Check port and generate secrets
+**0. Check port and generate secrets**
 
 The port you have selected for use should be MISSING from the list, when:
 ```bash
@@ -57,7 +57,8 @@ Generate 16 bytes/32 characters HEX with OpenSSL or another way:
 ```bash
 openssl rand -hex 16
 ```
-1. Place your config to /etc/telemt.toml
+
+**1. Place your config to /etc/telemt.toml**
 ```bash
 port = 443                              # Listening port
 
@@ -80,7 +81,7 @@ fast_mode = true                        # Use "fast" obfuscation variant
 client_keepalive = 600                  # Seconds
 client_ack_timeout = 300                # Seconds
 ```
-2. Create service on /etc/systemd/system/telemt.service
+**2. Create service on /etc/systemd/system/telemt.service**
 ```bash
 [Unit]
 Description=Telemt
@@ -95,9 +96,9 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 ```
-3. In Shell type `systemctl start telemt` - it must start with zero exit-code
-4. In Shell type `systemctl status telemt` - there you can reach info about current MTProxy status
-5. In Shell type `systemctl enable telemt` - then telemt will start with system startup, after the network is up
+**3.**  In Shell type `systemctl start telemt` - it must start with zero exit-code
+**4.** In Shell type `systemctl status telemt` - there you can reach info about current MTProxy status
+**5.** In Shell type `systemctl enable telemt` - then telemt will start with system startup, after the network is up
 
 ## FAQ
 ### Telegram Calls via MTProxy
