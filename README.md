@@ -231,6 +231,10 @@ telemt config.toml
 - Memory safety and reduced attack surface
 - Tokio's asynchronous architecture
 
+## Issues
+- ✅ [SOCKS5 as Upstream](https://github.com/telemt/telemt/issues/1) -> added Upstream Management
+- ⌛ [iOS - Media Upload Hanging-in-Loop](https://github.com/telemt/telemt/issue/2)
+
 ## Roadmap
 - Public IP in links
 - Config Reload-on-fly
