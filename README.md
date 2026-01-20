@@ -121,6 +121,10 @@ then Ctrl+X -> Y -> Enter to save
 ## Configuration
 ### Minimal Configuration for First Start
 ```toml
+# === UI ===
+# Users to show in the startup log (tg:// links)
+show_link = ["hello"]
+
 # === General Settings ===
 [general]
 prefer_ipv6 = false
@@ -195,10 +199,6 @@ weight = 10
 # address = "127.0.0.1:9050"
 # enabled = false
 # weight = 1
-
-# === UI ===
-# Users to show in the startup log (tg:// links)
-show_link = ["hello"]
 ```
 ### Advanced
 #### Adtag
