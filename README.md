@@ -256,10 +256,11 @@ we transparently direct traffic to the target host!
 - Here is our evidence:
     - 212.220.88.77 - "dummy" host, running `telemt`
     - `petrovich.ru` - `tls` + `masking` host, in HEX: `706574726f766963682e7275`
-  **I.** Client WITH secret-key accesses the MTProxy resource:
+  #### Client WITH secret-key accesses the MTProxy resource:
+  
   <img width="360" height="439" alt="telemt" src="https://github.com/user-attachments/assets/39352afb-4a11-4ecc-9d91-9e8cfb20607d" />
   
-  **II.** Client WITHOUT secret-key gets transparent access to the specified resource:
+  #### Client WITHOUT secret-key gets transparent access to the specified resource:
     - with trusted certificate
     - with original handshake
     - with full request-response way
