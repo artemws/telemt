@@ -14,6 +14,7 @@ fn default_port() -> u16 { 443 }
 fn default_tls_domain() -> String { "www.google.com".to_string() }
 fn default_mask_port() -> u16 { 443 }
 fn default_replay_check_len() -> usize { 65536 }
+fn default_replay_window_secs() -> u64 { 1800 }
 fn default_handshake_timeout() -> u64 { 15 }
 fn default_connect_timeout() -> u64 { 10 }
 fn default_keepalive() -> u64 { 60 }
@@ -187,6 +188,9 @@ pub struct AccessConfig {
     #[serde(default = "default_replay_check_len")]
     pub replay_check_len: usize,
     
+    #[serde(default = "default_replay_window_secs")]
+    pub replay_window_secs: u64,
+    
     #[serde(default)]
     pub ignore_time_skew: bool,
 }
@@ -201,6 +205,7 @@ impl Default for AccessConfig {
             user_expirations: HashMap::new(),
             user_data_quota: HashMap::new(),
             replay_check_len: default_replay_check_len(),
+            replay_window_secs: default_replay_window_secs(),
             ignore_time_skew: false,
         }
     }

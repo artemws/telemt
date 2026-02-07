@@ -21,6 +21,7 @@ mod util;
 use crate::config::ProxyConfig;
 use crate::proxy::ClientHandler;
 use crate::stats::{Stats, ReplayChecker};
+use crate::crypto::SecureRandom;
 use crate::transport::{create_listener, ListenOptions, UpstreamManager};
 use crate::util::ip::detect_ip;
 use crate::stream::BufferPool;
@@ -68,10 +69,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let config = Arc::new(config);
     let stats = Arc::new(Stats::new());
+    let rng = Arc::new(SecureRandom::new());
     
     // Initialize global ReplayChecker
     // Using sharded implementation for better concurrency
-    let replay_checker = Arc::new(ReplayChecker::new(config.access.replay_check_len));
+    let replay_checker = Arc::new(ReplayChecker::new(
+        config.access.replay_check_len,
+        Duration::from_secs(config.access.replay_window_secs),
+    ));
     
     // Initialize Upstream Manager
     let upstream_manager = Arc::new(UpstreamManager::new(config.upstreams.clone()));
@@ -166,6 +171,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let upstream_manager = upstream_manager.clone();
         let replay_checker = replay_checker.clone();
         let buffer_pool = buffer_pool.clone();
+        let rng = rng.clone();
         
         tokio::spawn(async move {
             loop {
@@ -176,6 +182,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let upstream_manager = upstream_manager.clone();
                         let replay_checker = replay_checker.clone();
                         let buffer_pool = buffer_pool.clone();
+                        let rng = rng.clone();
                         
                         tokio::spawn(async move {
                             if let Err(e) = ClientHandler::new(
@@ -185,7 +192,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 stats,
                                 upstream_manager,
                                 replay_checker,
-                                buffer_pool
+                                buffer_pool,
+                                rng
                             ).run().await {
                                 // Log only relevant errors
                             }

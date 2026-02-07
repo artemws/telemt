@@ -15,7 +15,7 @@ use crate::protocol::tls;
 use crate::stats::{Stats, ReplayChecker};
 use crate::transport::{configure_client_socket, UpstreamManager};
 use crate::stream::{CryptoReader, CryptoWriter, FakeTlsReader, FakeTlsWriter, BufferPool};
-use crate::crypto::AesCtr;
+use crate::crypto::{AesCtr, SecureRandom};
 
 // Use absolute paths to avoid confusion
 use crate::proxy::handshake::{
@@ -37,6 +37,7 @@ pub struct RunningClientHandler {
     replay_checker: Arc<ReplayChecker>,
     upstream_manager: Arc<UpstreamManager>,
     buffer_pool: Arc<BufferPool>,
+    rng: Arc<SecureRandom>,
 }
 
 impl ClientHandler {
@@ -49,6 +50,7 @@ impl ClientHandler {
         upstream_manager: Arc<UpstreamManager>,
         replay_checker: Arc<ReplayChecker>,
         buffer_pool: Arc<BufferPool>,
+        rng: Arc<SecureRandom>,
     ) -> RunningClientHandler {
         RunningClientHandler {
             stream,
@@ -58,6 +60,7 @@ impl ClientHandler {
             replay_checker,
             upstream_manager,
             buffer_pool,
+            rng,
         }
     }
 }
@@ -168,6 +171,7 @@ impl RunningClientHandler {
             peer,
             &config,
             &replay_checker,
+            &self.rng,
         ).await {
             HandshakeResult::Success(result) => result,
             HandshakeResult::BadClient { reader, writer } => {
@@ -211,7 +215,8 @@ impl RunningClientHandler {
             self.upstream_manager, 
             self.stats, 
             self.config,
-            buffer_pool
+            buffer_pool,
+            self.rng
         ).await
     }
     
@@ -272,7 +277,8 @@ impl RunningClientHandler {
             self.upstream_manager, 
             self.stats, 
             self.config,
-            buffer_pool
+            buffer_pool,
+            self.rng
         ).await
     }
     
@@ -285,6 +291,7 @@ impl RunningClientHandler {
         stats: Arc<Stats>,
         config: Arc<ProxyConfig>,
         buffer_pool: Arc<BufferPool>,
+        rng: Arc<SecureRandom>,
     ) -> Result<()>
     where
         R: AsyncRead + Unpin + Send + 'static,
@@ -321,6 +328,7 @@ impl RunningClientHandler {
             tg_stream, 
             &success,
             &config,
+            rng.as_ref(),
         ).await?;
         
         debug!(peer = %success.peer, "Telegram handshake complete, starting relay");
@@ -401,12 +409,14 @@ impl RunningClientHandler {
         mut stream: TcpStream,
         success: &HandshakeSuccess,
         config: &ProxyConfig,
+        rng: &SecureRandom,
     ) -> Result<(CryptoReader<tokio::net::tcp::OwnedReadHalf>, CryptoWriter<tokio::net::tcp::OwnedWriteHalf>)> {
         // Generate nonce with keys for TG
         let (nonce, tg_enc_key, tg_enc_iv, tg_dec_key, tg_dec_iv) = generate_tg_nonce(
             success.proto_tag,
             &success.dec_key,  // Client's dec key
             success.dec_iv,
+            rng,
             config.general.fast_mode,
         );
         

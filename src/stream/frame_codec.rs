@@ -5,9 +5,11 @@
 
 use bytes::{Bytes, BytesMut, BufMut};
 use std::io::{self, Error, ErrorKind};
+use std::sync::Arc;
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::protocol::constants::ProtoTag;
+use crate::crypto::SecureRandom;
 use super::frame::{Frame, FrameMeta, FrameCodec as FrameCodecTrait};
 
 // ============= Unified Codec =============
@@ -21,14 +23,17 @@ pub struct FrameCodec {
     proto_tag: ProtoTag,
     /// Maximum allowed frame size
     max_frame_size: usize,
+    /// RNG for secure padding
+    rng: Arc<SecureRandom>,
 }
 
 impl FrameCodec {
     /// Create a new codec for the given protocol
-    pub fn new(proto_tag: ProtoTag) -> Self {
+    pub fn new(proto_tag: ProtoTag, rng: Arc<SecureRandom>) -> Self {
         Self {
             proto_tag,
             max_frame_size: 16 * 1024 * 1024, // 16MB default
+            rng,
         }
     }
     
@@ -64,7 +69,7 @@ impl Encoder<Frame> for FrameCodec {
         match self.proto_tag {
             ProtoTag::Abridged => encode_abridged(&frame, dst),
             ProtoTag::Intermediate => encode_intermediate(&frame, dst),
-            ProtoTag::Secure => encode_secure(&frame, dst),
+            ProtoTag::Secure => encode_secure(&frame, dst, &self.rng),
         }
     }
 }
@@ -288,9 +293,7 @@ fn decode_secure(src: &mut BytesMut, max_size: usize) -> io::Result<Option<Frame
     Ok(Some(Frame::with_meta(data, meta)))
 }
 
-fn encode_secure(frame: &Frame, dst: &mut BytesMut) -> io::Result<()> {
-    use crate::crypto::random::SECURE_RANDOM;
-    
+fn encode_secure(frame: &Frame, dst: &mut BytesMut, rng: &SecureRandom) -> io::Result<()> {
     let data = &frame.data;
     
     // Simple ACK: just send data
@@ -303,10 +306,10 @@ fn encode_secure(frame: &Frame, dst: &mut BytesMut) -> io::Result<()> {
     // Generate padding to make length not divisible by 4
     let padding_len = if data.len() % 4 == 0 {
         // Add 1-3 bytes to make it non-aligned
-        (SECURE_RANDOM.range(3) + 1) as usize
+        (rng.range(3) + 1) as usize
     } else {
         // Already non-aligned, can add 0-3
-        SECURE_RANDOM.range(4) as usize
+        rng.range(4) as usize
     };
     
     let total_len = data.len() + padding_len;
@@ -321,7 +324,7 @@ fn encode_secure(frame: &Frame, dst: &mut BytesMut) -> io::Result<()> {
     dst.extend_from_slice(data);
     
     if padding_len > 0 {
-        let padding = SECURE_RANDOM.bytes(padding_len);
+        let padding = rng.bytes(padding_len);
         dst.extend_from_slice(&padding);
     }
     
@@ -445,19 +448,21 @@ impl FrameCodecTrait for IntermediateCodec {
 /// Secure Intermediate protocol codec
 pub struct SecureCodec {
     max_frame_size: usize,
+    rng: Arc<SecureRandom>,
 }
 
 impl SecureCodec {
-    pub fn new() -> Self {
+    pub fn new(rng: Arc<SecureRandom>) -> Self {
         Self {
             max_frame_size: 16 * 1024 * 1024,
+            rng,
         }
     }
 }
 
 impl Default for SecureCodec {
     fn default() -> Self {
-        Self::new()
+        Self::new(Arc::new(SecureRandom::new()))
     }
 }
 
@@ -474,7 +479,7 @@ impl Encoder<Frame> for SecureCodec {
     type Error = io::Error;
     
     fn encode(&mut self, frame: Frame, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        encode_secure(&frame, dst)
+        encode_secure(&frame, dst, &self.rng)
     }
 }
 
@@ -485,7 +490,7 @@ impl FrameCodecTrait for SecureCodec {
     
     fn encode(&self, frame: &Frame, dst: &mut BytesMut) -> io::Result<usize> {
         let before = dst.len();
-        encode_secure(frame, dst)?;
+        encode_secure(frame, dst, &self.rng)?;
         Ok(dst.len() - before)
     }
     
@@ -506,6 +511,8 @@ mod tests {
     use tokio_util::codec::{FramedRead, FramedWrite};
     use tokio::io::duplex;
     use futures::{SinkExt, StreamExt};
+    use crate::crypto::SecureRandom;
+    use std::sync::Arc;
     
     #[tokio::test]
     async fn test_framed_abridged() {
@@ -541,8 +548,8 @@ mod tests {
     async fn test_framed_secure() {
         let (client, server) = duplex(4096);
         
-        let mut writer = FramedWrite::new(client, SecureCodec::new());
-        let mut reader = FramedRead::new(server, SecureCodec::new());
+        let mut writer = FramedWrite::new(client, SecureCodec::new(Arc::new(SecureRandom::new())));
+        let mut reader = FramedRead::new(server, SecureCodec::new(Arc::new(SecureRandom::new())));
         
         let original = Bytes::from_static(&[1, 2, 3, 4, 5, 6, 7, 8]);
         let frame = Frame::new(original.clone());
@@ -557,8 +564,8 @@ mod tests {
         for proto_tag in [ProtoTag::Abridged, ProtoTag::Intermediate, ProtoTag::Secure] {
             let (client, server) = duplex(4096);
             
-            let mut writer = FramedWrite::new(client, FrameCodec::new(proto_tag));
-            let mut reader = FramedRead::new(server, FrameCodec::new(proto_tag));
+            let mut writer = FramedWrite::new(client, FrameCodec::new(proto_tag, Arc::new(SecureRandom::new())));
+            let mut reader = FramedRead::new(server, FrameCodec::new(proto_tag, Arc::new(SecureRandom::new())));
             
             // Use 4-byte aligned data for abridged compatibility
             let original = Bytes::from_static(&[1, 2, 3, 4, 5, 6, 7, 8]);
@@ -607,7 +614,7 @@ mod tests {
     
     #[test]
     fn test_frame_too_large() {
-        let mut codec = FrameCodec::new(ProtoTag::Intermediate)
+        let mut codec = FrameCodec::new(ProtoTag::Intermediate, Arc::new(SecureRandom::new()))
             .with_max_frame_size(100);
         
         // Create a "frame" that claims to be very large

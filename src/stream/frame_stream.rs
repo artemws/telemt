@@ -4,8 +4,8 @@ use bytes::{Bytes, BytesMut};
 use std::io::{Error, ErrorKind, Result};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use crate::protocol::constants::*;
-use crate::crypto::crc32;
-use crate::crypto::random::SECURE_RANDOM;
+use crate::crypto::{crc32, SecureRandom};
+use std::sync::Arc;
 use super::traits::{FrameMeta, LayeredStream};
 
 // ============= Abridged (Compact) Frame =============
@@ -251,11 +251,12 @@ impl<R> LayeredStream<R> for SecureIntermediateFrameReader<R> {
 /// Writer for secure intermediate MTProto framing
 pub struct SecureIntermediateFrameWriter<W> {
     upstream: W,
+    rng: Arc<SecureRandom>,
 }
 
 impl<W> SecureIntermediateFrameWriter<W> {
-    pub fn new(upstream: W) -> Self {
-        Self { upstream }
+    pub fn new(upstream: W, rng: Arc<SecureRandom>) -> Self {
+        Self { upstream, rng }
     }
 }
 
@@ -267,8 +268,8 @@ impl<W: AsyncWrite + Unpin> SecureIntermediateFrameWriter<W> {
         }
         
         // Add random padding (0-3 bytes)
-        let padding_len = SECURE_RANDOM.range(4);
-        let padding = SECURE_RANDOM.bytes(padding_len);
+        let padding_len = self.rng.range(4);
+        let padding = self.rng.bytes(padding_len);
         
         let total_len = data.len() + padding_len;
         let len_bytes = (total_len as u32).to_le_bytes();
@@ -454,11 +455,11 @@ pub enum FrameWriterKind<W> {
 }
 
 impl<W: AsyncWrite + Unpin> FrameWriterKind<W> {
-    pub fn new(upstream: W, proto_tag: ProtoTag) -> Self {
+    pub fn new(upstream: W, proto_tag: ProtoTag, rng: Arc<SecureRandom>) -> Self {
         match proto_tag {
             ProtoTag::Abridged => FrameWriterKind::Abridged(AbridgedFrameWriter::new(upstream)),
             ProtoTag::Intermediate => FrameWriterKind::Intermediate(IntermediateFrameWriter::new(upstream)),
-            ProtoTag::Secure => FrameWriterKind::SecureIntermediate(SecureIntermediateFrameWriter::new(upstream)),
+            ProtoTag::Secure => FrameWriterKind::SecureIntermediate(SecureIntermediateFrameWriter::new(upstream, rng)),
         }
     }
     
@@ -483,6 +484,8 @@ impl<W: AsyncWrite + Unpin> FrameWriterKind<W> {
 mod tests {
     use super::*;
     use tokio::io::duplex;
+    use std::sync::Arc;
+    use crate::crypto::SecureRandom;
     
     #[tokio::test]
     async fn test_abridged_roundtrip() {
@@ -539,7 +542,7 @@ mod tests {
     async fn test_secure_intermediate_padding() {
         let (client, server) = duplex(1024);
         
-        let mut writer = SecureIntermediateFrameWriter::new(client);
+        let mut writer = SecureIntermediateFrameWriter::new(client, Arc::new(SecureRandom::new()));
         let mut reader = SecureIntermediateFrameReader::new(server);
         
         let data = vec![1u8, 2, 3, 4, 5, 6, 7, 8];
@@ -572,7 +575,7 @@ mod tests {
     async fn test_frame_reader_kind() {
         let (client, server) = duplex(1024);
         
-        let mut writer = FrameWriterKind::new(client, ProtoTag::Intermediate);
+        let mut writer = FrameWriterKind::new(client, ProtoTag::Intermediate, Arc::new(SecureRandom::new()));
         let mut reader = FrameReaderKind::new(server, ProtoTag::Intermediate);
         
         let data = vec![1u8, 2, 3, 4];

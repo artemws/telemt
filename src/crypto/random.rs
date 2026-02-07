@@ -4,11 +4,6 @@ use rand::{Rng, RngCore, SeedableRng};
 use rand::rngs::StdRng;
 use parking_lot::Mutex;
 use crate::crypto::AesCtr;
-use once_cell::sync::Lazy;
-
-/// Global secure random instance
-pub static SECURE_RANDOM: Lazy<SecureRandom> = Lazy::new(SecureRandom::new);
-
 /// Cryptographically secure PRNG with AES-CTR
 pub struct SecureRandom {
     inner: Mutex<SecureRandomInner>,

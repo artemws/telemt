@@ -4,7 +4,7 @@
 //! for domain fronting. The handshake looks like valid TLS 1.3 but
 //! actually carries MTProto authentication data.
 
-use crate::crypto::{sha256_hmac, random::SECURE_RANDOM};
+use crate::crypto::{sha256_hmac, SecureRandom};
 use crate::error::{ProxyError, Result};
 use super::constants::*;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -315,8 +315,8 @@ pub fn validate_tls_handshake(
 ///
 /// This generates random bytes that look like a valid X25519 public key.
 /// Since we're not doing real TLS, the actual cryptographic properties don't matter.
-pub fn gen_fake_x25519_key() -> [u8; 32] {
-    let bytes = SECURE_RANDOM.bytes(32);
+pub fn gen_fake_x25519_key(rng: &SecureRandom) -> [u8; 32] {
+    let bytes = rng.bytes(32);
     bytes.try_into().unwrap()
 }
 
@@ -333,8 +333,9 @@ pub fn build_server_hello(
     client_digest: &[u8; TLS_DIGEST_LEN],
     session_id: &[u8],
     fake_cert_len: usize,
+    rng: &SecureRandom,
 ) -> Vec<u8> {
-    let x25519_key = gen_fake_x25519_key();
+    let x25519_key = gen_fake_x25519_key(rng);
     
     // Build ServerHello
     let server_hello = ServerHelloBuilder::new(session_id.to_vec())
@@ -351,7 +352,7 @@ pub fn build_server_hello(
     ];
     
     // Build fake certificate (Application Data record)
-    let fake_cert = SECURE_RANDOM.bytes(fake_cert_len);
+    let fake_cert = rng.bytes(fake_cert_len);
     let mut app_data_record = Vec::with_capacity(5 + fake_cert_len);
     app_data_record.push(TLS_RECORD_APPLICATION);
     app_data_record.extend_from_slice(&TLS_VERSION);
@@ -489,8 +490,9 @@ mod tests {
     
     #[test]
     fn test_gen_fake_x25519_key() {
-        let key1 = gen_fake_x25519_key();
-        let key2 = gen_fake_x25519_key();
+        let rng = SecureRandom::new();
+        let key1 = gen_fake_x25519_key(&rng);
+        let key2 = gen_fake_x25519_key(&rng);
         
         assert_eq!(key1.len(), 32);
         assert_eq!(key2.len(), 32);
@@ -545,7 +547,8 @@ mod tests {
         let client_digest = [0x42u8; 32];
         let session_id = vec![0xAA; 32];
         
-        let response = build_server_hello(secret, &client_digest, &session_id, 2048);
+        let rng = SecureRandom::new();
+        let response = build_server_hello(secret, &client_digest, &session_id, 2048, &rng);
         
         // Should have at least 3 records
         assert!(response.len() > 100);
@@ -577,8 +580,9 @@ mod tests {
         let client_digest = [0x42u8; 32];
         let session_id = vec![0xAA; 32];
         
-        let response1 = build_server_hello(secret, &client_digest, &session_id, 1024);
-        let response2 = build_server_hello(secret, &client_digest, &session_id, 1024);
+        let rng = SecureRandom::new();
+        let response1 = build_server_hello(secret, &client_digest, &session_id, 1024, &rng);
+        let response2 = build_server_hello(secret, &client_digest, &session_id, 1024, &rng);
         
         // Digest position should have non-zero data
         let digest1 = &response1[TLS_DIGEST_POS..TLS_DIGEST_POS + TLS_DIGEST_LEN];

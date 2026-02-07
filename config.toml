@@ -49,6 +49,7 @@ fake_cert_len = 2048
 # username "hello" is used for example
 [access]
 replay_check_len = 65536
+replay_window_secs = 1800
 ignore_time_skew = false
 
 [access.users]

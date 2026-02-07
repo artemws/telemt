@@ -5,8 +5,10 @@
 
 use bytes::{Bytes, BytesMut};
 use std::io::Result;
+use std::sync::Arc;
 
 use crate::protocol::constants::ProtoTag;
+use crate::crypto::SecureRandom;
 
 // ============= Frame Types =============
 
@@ -147,11 +149,11 @@ pub trait FrameCodec: Send + Sync {
 // ============= Codec Factory =============
 
 /// Create a frame codec for the given protocol tag
-pub fn create_codec(proto_tag: ProtoTag) -> Box<dyn FrameCodec> {
+pub fn create_codec(proto_tag: ProtoTag, rng: Arc<SecureRandom>) -> Box<dyn FrameCodec> {
     match proto_tag {
         ProtoTag::Abridged => Box::new(crate::stream::frame_codec::AbridgedCodec::new()),
         ProtoTag::Intermediate => Box::new(crate::stream::frame_codec::IntermediateCodec::new()),
-        ProtoTag::Secure => Box::new(crate::stream::frame_codec::SecureCodec::new()),
+        ProtoTag::Secure => Box::new(crate::stream::frame_codec::SecureCodec::new(rng)),
     }
 }
 

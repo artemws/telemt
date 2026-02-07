@@ -4,8 +4,7 @@ use std::net::SocketAddr;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tracing::{debug, warn, trace, info};
 
-use crate::crypto::{sha256, AesCtr};
-use crate::crypto::random::SECURE_RANDOM;
+use crate::crypto::{sha256, AesCtr, SecureRandom};
 use crate::protocol::constants::*;
 use crate::protocol::tls;
 use crate::stream::{FakeTlsReader, FakeTlsWriter, CryptoReader, CryptoWriter};
@@ -42,6 +41,7 @@ pub async fn handle_tls_handshake<R, W>(
     peer: SocketAddr,
     config: &ProxyConfig,
     replay_checker: &ReplayChecker,
+    rng: &SecureRandom,
 ) -> HandshakeResult<(FakeTlsReader<R>, FakeTlsWriter<W>, String), R, W>
 where
     R: AsyncRead + Unpin,
@@ -101,6 +101,7 @@ where
         &validation.digest,
         &validation.session_id,
         config.censorship.fake_cert_len,
+        rng,
     );
     
     debug!(peer = %peer, response_len = response.len(), "Sending TLS ServerHello");
@@ -264,10 +265,11 @@ pub fn generate_tg_nonce(
     proto_tag: ProtoTag, 
     client_dec_key: &[u8; 32],
     client_dec_iv: u128,
+    rng: &SecureRandom,
     fast_mode: bool,
 ) -> ([u8; HANDSHAKE_LEN], [u8; 32], u128, [u8; 32], u128) {
     loop {
-        let bytes = SECURE_RANDOM.bytes(HANDSHAKE_LEN);
+        let bytes = rng.bytes(HANDSHAKE_LEN);
         let mut nonce: [u8; HANDSHAKE_LEN] = bytes.try_into().unwrap();
         
         if RESERVED_NONCE_FIRST_BYTES.contains(&nonce[0]) { continue; }
@@ -323,8 +325,9 @@ mod tests {
         let client_dec_key = [0x42u8; 32];
         let client_dec_iv = 12345u128;
         
+        let rng = SecureRandom::new();
         let (nonce, tg_enc_key, tg_enc_iv, tg_dec_key, tg_dec_iv) = 
-            generate_tg_nonce(ProtoTag::Secure, &client_dec_key, client_dec_iv, false);
+            generate_tg_nonce(ProtoTag::Secure, &client_dec_key, client_dec_iv, &rng, false);
         
         // Check length
         assert_eq!(nonce.len(), HANDSHAKE_LEN);
@@ -339,8 +342,9 @@ mod tests {
         let client_dec_key = [0x42u8; 32];
         let client_dec_iv = 12345u128;
         
+        let rng = SecureRandom::new();
         let (nonce, _, _, _, _) = 
-            generate_tg_nonce(ProtoTag::Secure, &client_dec_key, client_dec_iv, false);
+            generate_tg_nonce(ProtoTag::Secure, &client_dec_key, client_dec_iv, &rng, false);
         
         let encrypted = encrypt_tg_nonce(&nonce);
         
