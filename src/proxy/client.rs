@@ -19,9 +19,9 @@
     use crate::crypto::{AesCtr, SecureRandom};
     
     use crate::proxy::handshake::{
-        handle_tls_handshake, handle_mtproto_handshake, 
-        HandshakeSuccess, generate_tg_nonce, encrypt_tg_nonce,
-    };
+            handle_tls_handshake, handle_mtproto_handshake, 
+            HandshakeSuccess, generate_tg_nonce, encrypt_tg_nonce_with_ciphers,
+        };
     use crate::proxy::relay::relay_bidirectional;
     use crate::proxy::masking::handle_bad_client;
     
@@ -340,8 +340,8 @@
         /// - ME returns responses in RPC_PROXY_ANS envelope
         
     async fn handle_via_middle_proxy<R, W>(
-        mut client_reader: CryptoReader<R>,
-        mut client_writer: CryptoWriter<W>,
+        crypto_reader: CryptoReader<R>,
+        crypto_writer: CryptoWriter<W>,
         success: HandshakeSuccess,
         me_pool: Arc<MePool>,
         stats: Arc<Stats>,
@@ -352,7 +352,10 @@
         R: AsyncRead + Unpin + Send + 'static,
         W: AsyncWrite + Unpin + Send + 'static,
     {
-        let user = success.user.clone();
+            let mut client_reader = crypto_reader;
+            let mut client_writer = crypto_writer;
+    
+            let user = success.user.clone();
         let peer = success.peer;
 
         info!(
@@ -635,8 +638,8 @@
                 rng,
                 config.general.fast_mode,
             );
-    
-            let encrypted_nonce = encrypt_tg_nonce(&nonce);
+
+            let (encrypted_nonce, mut tg_encryptor, tg_decryptor) = encrypt_tg_nonce_with_ciphers(&nonce);
     
             debug!(
                 peer = %success.peer,
@@ -649,12 +652,9 @@
     
             let (read_half, write_half) = stream.into_split();
     
-            let decryptor = AesCtr::new(&tg_dec_key, tg_dec_iv);
-            let encryptor = AesCtr::new(&tg_enc_key, tg_enc_iv);
-    
             Ok((
-                CryptoReader::new(read_half, decryptor),
-                CryptoWriter::new(write_half, encryptor),
+                CryptoReader::new(read_half, tg_decryptor),
+                CryptoWriter::new(write_half, tg_encryptor),
             ))
         }
     }
