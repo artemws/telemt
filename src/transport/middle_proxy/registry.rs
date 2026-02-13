@@ -12,9 +12,11 @@ pub struct ConnRegistry {
 
 impl ConnRegistry {
     pub fn new() -> Self {
+        // Avoid fully predictable conn_id sequence from 1.
+        let start = rand::random::<u64>() | 1;
         Self {
             map: RwLock::new(HashMap::new()),
-            next_id: AtomicU64::new(1),
+            next_id: AtomicU64::new(start),
         }
     }
 

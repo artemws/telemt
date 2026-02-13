@@ -5,6 +5,7 @@ mod health;
 mod pool;
 mod reader;
 mod registry;
+mod send;
 mod secret;
 mod wire;
 

@@ -1,6 +1,6 @@
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 
 use bytes::BytesMut;
@@ -20,13 +20,15 @@ use super::codec::{
     cbc_encrypt_padded, parse_nonce_payload, read_rpc_frame_plaintext,
 };
 use super::reader::reader_loop;
-use super::wire::{IpMaterial, build_proxy_req_payload, extract_ip_material};
+use super::wire::{IpMaterial, extract_ip_material};
+
+const ME_ACTIVE_PING_SECS: u64 = 25;
 
 pub struct MePool {
-    registry: Arc<ConnRegistry>,
-    writers: Arc<RwLock<Vec<Arc<Mutex<RpcWriter>>>>>,
-    rr: AtomicU64,
-    proxy_tag: Option<Vec<u8>>,
+    pub(super) registry: Arc<ConnRegistry>,
+    pub(super) writers: Arc<RwLock<Vec<Arc<Mutex<RpcWriter>>>>>,
+    pub(super) rr: AtomicU64,
+    pub(super) proxy_tag: Option<Vec<u8>>,
     proxy_secret: Vec<u8>,
     nat_ip: Option<IpAddr>,
     pool_size: usize,
@@ -351,6 +353,8 @@ impl MePool {
         let reg = self.registry.clone();
         let w_pong = rpc_w.clone();
         let w_pool = self.writers_arc();
+        let w_ping = rpc_w.clone();
+        let w_pool_ping = self.writers_arc();
         tokio::spawn(async move {
             if let Err(e) =
                 reader_loop(rd, rk, read_iv, reg, enc_buf, dec_buf, w_pong.clone()).await
@@ -361,71 +365,24 @@ impl MePool {
             ws.retain(|w| !Arc::ptr_eq(w, &w_pong));
             info!(remaining = ws.len(), "Dead ME writer removed from pool");
         });
-
-        Ok(())
-    }
-
-    pub async fn send_proxy_req(
-        &self,
-        conn_id: u64,
-        client_addr: SocketAddr,
-        our_addr: SocketAddr,
-        data: &[u8],
-        proto_flags: u32,
-    ) -> Result<()> {
-        let payload = build_proxy_req_payload(
-            conn_id,
-            client_addr,
-            our_addr,
-            data,
-            self.proxy_tag.as_deref(),
-            proto_flags,
-        );
-
-        loop {
-            let ws = self.writers.read().await;
-            if ws.is_empty() {
-                return Err(ProxyError::Proxy("All ME connections dead".into()));
-            }
-
-            let idx = self.rr.fetch_add(1, Ordering::Relaxed) as usize % ws.len();
-            let w = ws[idx].clone();
-            drop(ws);
-
-            match w.lock().await.send(&payload).await {
-                Ok(()) => return Ok(()),
-                Err(e) => {
-                    warn!(error = %e, "ME write failed, removing dead conn");
-                    let mut ws = self.writers.write().await;
-                    ws.retain(|o| !Arc::ptr_eq(o, &w));
-                    if ws.is_empty() {
-                        return Err(ProxyError::Proxy("All ME connections dead".into()));
-                    }
+        tokio::spawn(async move {
+            let mut ping_id: i64 = rand::random::<i64>();
+            loop {
+                tokio::time::sleep(Duration::from_secs(ME_ACTIVE_PING_SECS)).await;
+                let mut p = Vec::with_capacity(12);
+                p.extend_from_slice(&RPC_PING_U32.to_le_bytes());
+                p.extend_from_slice(&ping_id.to_le_bytes());
+                ping_id = ping_id.wrapping_add(1);
+                if let Err(e) = w_ping.lock().await.send(&p).await {
+                    debug!(error = %e, "Active ME ping failed, removing dead writer");
+                    let mut ws = w_pool_ping.write().await;
+                    ws.retain(|w| !Arc::ptr_eq(w, &w_ping));
+                    break;
                 }
             }
-        }
-    }
+        });
 
-    pub async fn send_close(&self, conn_id: u64) -> Result<()> {
-        let ws = self.writers.read().await;
-        if !ws.is_empty() {
-            let w = ws[0].clone();
-            drop(ws);
-            let mut p = Vec::with_capacity(12);
-            p.extend_from_slice(&RPC_CLOSE_EXT_U32.to_le_bytes());
-            p.extend_from_slice(&conn_id.to_le_bytes());
-            if let Err(e) = w.lock().await.send(&p).await {
-                debug!(error = %e, "ME close write failed");
-                let mut ws = self.writers.write().await;
-                ws.retain(|o| !Arc::ptr_eq(o, &w));
-            }
-        }
-
-        self.registry.unregister(conn_id).await;
         Ok(())
     }
 
-    pub fn connection_count(&self) -> usize {
-        self.writers.try_read().map(|w| w.len()).unwrap_or(0)
-    }
 }
