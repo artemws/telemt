@@ -4,27 +4,51 @@
 
 ## NEWS and EMERGENCY
 ### ✈️ Telemt 3 is released!
-#### RU
-15 ферваля мы опубликовали `telemt 3` с поддержкой Middle-End Proxy, а значит:
-- с функциональными медиа, в том числе с CDN/DC=203
-- с Ad-tag - показывайте спонсорский канал и собирайте статистику через официального бота
-- с новым подходом к безопасности и асинхронности
-- с высокоточной диагностикой криптонрафии через `ME_DIAG`
+<table>
+<tr>
+<td width="50%" valign="top">
 
-Для использования нужно указать `use_middle_proxy = true` в версии `telemt` 3.0.0 и последующих
+### 🇷🇺 RU
 
-Если у вас есть компетенции в асинхронных сетевых приложениях, анализе трафика, реверс-инжиниринге софта, "сетевых расследованиях" - мы открыты к мыслям, предложениям, pull requests
+15 февраля мы опубликовали `telemt 3` с поддержкой Middle-End Proxy, а значит:
 
-#### EN
-On February 15, we released `telemt 3` with support for Middle-End Proxy, which means:
-- functional media, including CDN/DC=203
-- Ad-tag support – promote a sponsored channel and collect statistics via Telegram bot
-- new approach to security and asynchronicity
-- high-precision cryptography diagnostics via `ME_DIAG`
+- с функциональными медиа, в том числе с CDN/DC=203  
+- с Ad-tag — показывайте спонсорский канал и собирайте статистику через официального бота  
+- с новым подходом к безопасности и асинхронности  
+- с высокоточной диагностикой криптографии через `ME_DIAG`  
 
-For using you should set `use_middle_proxy = true` in version `telemt` 3.0.0 or later
+Для использования нужно указать:
+```toml
+use_middle_proxy = true
+```
 
-If you have expertise in asynchronous network applications, traffic analysis, software reverse engineering, or network forensics – we're open to ideas, suggestions, and pull requests.
+в версии `telemt` 3.0.0 и последующих.
+
+Если у вас есть компетенции в асинхронных сетевых приложениях, анализе трафика, реверс-инжиниринге или сетевых расследованиях — мы открыты к идеям и pull requests.
+
+</td>
+<td width="50%" valign="top">
+
+### 🇬🇧 EN
+
+On February 15, we released `telemt 3` with support for Middle-End Proxy, which means:
+
+- functional media, including CDN/DC=203  
+- Ad-tag support – promote a sponsored channel and collect statistics via Telegram bot  
+- new approach to security and asynchronicity  
+- high-precision cryptography diagnostics via `ME_DIAG`  
+
+To use it, set:
+```toml
+use_middle_proxy = true
+```
+in version `telemt` 3.0.0 or later.
+
+If you have expertise in asynchronous network applications, traffic analysis, reverse engineering, or network forensics — we welcome ideas, suggestions, and pull requests.
+
+</td>
+</tr>
+</table>
 
 # Features
 💥 The configuration structure has changed since version 1.1.0.0. change it in your environment!
