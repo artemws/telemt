@@ -26,6 +26,14 @@ use_middle_proxy = true
 - публичный IP для исходящих соединений установлен на интерфейса инстанса с `telemt`
 - вы используете NAT 1:1 + включили STUN-пробинг
 
+Если нет:
+1. Установите `use_middle_proxy = false` или Middle-End Proxy будет выключен автоматически по таймауту, но это займёт больше времени при запуске
+2. Пропишите в конец конфига
+```toml
+[dc_overrides]
+"203" = "91.105.192.100:443"
+```
+
 Если у вас есть компетенции в асинхронных сетевых приложениях, анализе трафика, реверс-инжиниринге или сетевых расследованиях — мы открыты к идеям и pull requests.
 
 </td>
@@ -47,6 +55,14 @@ use_middle_proxy = true
 in version `telemt` 3.0.0 or later, if any set of conditions is met:
 - public IP for outgoing connections is set on the instance interface with `telemt`
 - you are using NAT 1:1 + enabled STUN-probe
+
+If not:
+1. set `use_middle_proxy = false` or Middle-End Proxy will be turned off automatically by timeout, but it will take longer at startup
+2. Place to the end of your config
+```toml
+[dc_overrides]
+"203" = "91.105.192.100:443"
+```
 
 If you have expertise in asynchronous network applications, traffic analysis, reverse engineering, or network forensics — we welcome ideas, suggestions, and pull requests.
 
