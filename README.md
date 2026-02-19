@@ -95,7 +95,7 @@ If you have expertise in asynchronous network applications, traffic analysis, re
 **This software is designed for Debian-based OS: in addition to Debian, these are Ubuntu, Mint, Kali, MX and many other Linux**
 1. Download release
 ```bash
-wget $(curl -s https://api.github.com/repos/telemt/telemt/releases/latest | grep "browser_download_url.*$(uname -m).*linux-gnu.tar.gz" | cut -d '"' -f 4) -O telemt.tar.gz && tar -xzf telemt.tar.gz && rm telemt.tar.gz
+wget -qO- "https://github.com/telemt/telemt/releases/latest/download/telemt-$(uname -m)-linux-$(ldd --version 2>&1 | grep -iq musl && echo musl || echo gnu).tar.gz" | tar -xz
 ```
 2. Move to Bin Folder
 ```bash
