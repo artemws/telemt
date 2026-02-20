@@ -58,6 +58,7 @@ pub async fn handle_tls_handshake<R, W>(
     config: &ProxyConfig,
     replay_checker: &ReplayChecker,
     rng: &SecureRandom,
+    tls_cache: Option<Arc<TlsFrontCache>>,
 ) -> HandshakeResult<(FakeTlsReader<R>, FakeTlsWriter<W>, String), R, W>
 where
     R: AsyncRead + Unpin,
@@ -105,13 +106,37 @@ where
         None => return HandshakeResult::BadClient { reader, writer },
     };
 
-    let response = tls::build_server_hello(
-        secret,
-        &validation.digest,
-        &validation.session_id,
-        config.censorship.fake_cert_len,
-        rng,
-    );
+    let cached = if config.censorship.tls_emulation {
+        if let Some(cache) = tls_cache.as_ref() {
+            if let Some(sni) = tls::extract_sni_from_client_hello(handshake) {
+                Some(cache.get(&sni).await)
+            } else {
+                Some(cache.get(&config.censorship.tls_domain).await)
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let response = if let Some(cached_entry) = cached {
+        emulator::build_emulated_server_hello(
+            secret,
+            &validation.digest,
+            &validation.session_id,
+            &cached_entry,
+            rng,
+        )
+    } else {
+        tls::build_server_hello(
+            secret,
+            &validation.digest,
+            &validation.session_id,
+            config.censorship.fake_cert_len,
+            rng,
+        )
+    };
 
     debug!(peer = %peer, response_len = response.len(), "Sending TLS ServerHello");
 
