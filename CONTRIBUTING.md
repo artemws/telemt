@@ -1,10 +1,11 @@
-## Pull Requests - Rules
+# Pull Requests - Rules
+## General
 - ONLY signed and verified commits
 - ONLY from your name
 - DO NOT commit with `codex` or `claude` as author/commiter
 - PREFER `flow` branch for development, not `main`
 
-### AI
+## AI
 We are not against modern tools, like AI, where you act as a principal or architect, but we consider it important:
 
 - you really understand what you're doing
