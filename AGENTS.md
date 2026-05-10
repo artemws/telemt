@@ -191,6 +191,11 @@ When facing a non-trivial modification, follow this sequence:
 4. **Implement**: Make the minimal, isolated change.
 5. **Verify**: Explain why the change preserves existing behavior and architectural integrity.
 
+When the repository contains a `PLAN.md` for the current task, maintain it as
+a working checkbox plan while implementing changes. Mark completed and partial
+items in `PLAN.md` as the code changes land, so the remaining work stays
+explicit and future passes do not waste time rediscovering status.
+
 ---
 
 ### 9. Context Awareness
