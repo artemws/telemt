@@ -21,8 +21,7 @@ pub enum LogLevel {
     #[default]
     Normal,
     /// Minimal output: only warnings and errors (warn + error).
-    /// Startup messages (config, DC connectivity, proxy links) are always shown
-    /// via info! before the filter is applied.
+    /// Proxy links may still be emitted through their dedicated target.
     Silent,
 }
 

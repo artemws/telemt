@@ -319,13 +319,7 @@ pub(crate) async fn apply_runtime_log_filter(
     filter_handle: reload::Handle<EnvFilter, tracing_subscriber::Registry>,
     mut log_level_rx: watch::Receiver<LogLevel>,
 ) {
-    let runtime_filter = if has_rust_log {
-        EnvFilter::from_default_env()
-    } else if matches!(effective_log_level, LogLevel::Silent) {
-        EnvFilter::new("warn,telemt::links=info")
-    } else {
-        EnvFilter::new(effective_log_level.to_filter_str())
-    };
+    let runtime_filter = EnvFilter::new(log_filter_spec(has_rust_log, effective_log_level));
     filter_handle
         .reload(runtime_filter)
         .expect("Failed to switch log filter");
@@ -336,12 +330,23 @@ pub(crate) async fn apply_runtime_log_filter(
                 break;
             }
             let level = log_level_rx.borrow_and_update().clone();
-            let new_filter = tracing_subscriber::EnvFilter::new(level.to_filter_str());
+            let new_filter = tracing_subscriber::EnvFilter::new(log_filter_spec(false, &level));
             if let Err(e) = filter_handle.reload(new_filter) {
                 tracing::error!("config reload: failed to update log filter: {}", e);
             }
         }
     });
+}
+
+pub(crate) fn log_filter_spec(has_rust_log: bool, effective_log_level: &LogLevel) -> String {
+    if has_rust_log {
+        std::env::var("RUST_LOG")
+            .unwrap_or_else(|_| effective_log_level.to_filter_str().to_string())
+    } else if matches!(effective_log_level, LogLevel::Silent) {
+        "warn,telemt::links=info".to_string()
+    } else {
+        effective_log_level.to_filter_str().to_string()
+    }
 }
 
 pub(crate) async fn spawn_metrics_if_configured(

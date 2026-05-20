@@ -47,7 +47,7 @@ use crate::stats::{ReplayChecker, Stats};
 use crate::stream::BufferPool;
 use crate::transport::UpstreamManager;
 use crate::transport::middle_proxy::MePool;
-use helpers::{parse_cli, resolve_runtime_base_dir, resolve_runtime_config_path};
+use helpers::{parse_cli, print_maestro_line, resolve_runtime_base_dir, resolve_runtime_config_path};
 
 #[cfg(unix)]
 use crate::daemon::{DaemonOptions, PidFile, drop_privileges};
@@ -325,7 +325,9 @@ async fn run_telemt_core(
         config.general.log_level.clone()
     };
 
-    let (filter_layer, filter_handle) = reload::Layer::new(EnvFilter::new("info"));
+    let initial_filter_spec = runtime_tasks::log_filter_spec(has_rust_log, &effective_log_level);
+    let (filter_layer, filter_handle) =
+        reload::Layer::new(EnvFilter::new(initial_filter_spec.clone()));
     startup_tracker
         .start_component(
             COMPONENT_TRACING_INIT,
@@ -356,7 +358,7 @@ async fn run_telemt_core(
                 destination: log_destination,
                 disable_colors: true,
             };
-            let (_, guard) = crate::logging::init_logging(&logging_opts, "info");
+            let (_, guard) = crate::logging::init_logging(&logging_opts, &initial_filter_spec);
             _logging_guard = Some(guard);
         }
         crate::logging::LogDestination::File { .. } => {
@@ -365,7 +367,7 @@ async fn run_telemt_core(
                 destination: log_destination,
                 disable_colors: true,
             };
-            let (_, guard) = crate::logging::init_logging(&logging_opts, "info");
+            let (_, guard) = crate::logging::init_logging(&logging_opts, &initial_filter_spec);
             _logging_guard = Some(guard);
         }
     }
@@ -377,7 +379,7 @@ async fn run_telemt_core(
         )
         .await;
 
-    info!("Telemt MTProxy v{}", env!("CARGO_PKG_VERSION"));
+    print_maestro_line(format!("Telemt MTProxy v{}", env!("CARGO_PKG_VERSION")));
     info!("Log level: {}", effective_log_level);
     if config.general.disable_colors {
         info!("Colors: disabled");

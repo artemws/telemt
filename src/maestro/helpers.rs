@@ -15,6 +15,13 @@ use crate::transport::middle_proxy::{
     save_proxy_config_cache,
 };
 
+const MAESTRO_COLOR: &str = "\x1b[92m";
+const COLOR_RESET: &str = "\x1b[0m";
+
+pub(crate) fn print_maestro_line(message: impl AsRef<str>) {
+    eprintln!("{MAESTRO_COLOR}MAESTRO{COLOR_RESET}: {}", message.as_ref());
+}
+
 pub(crate) fn resolve_runtime_config_path(
     config_path_cli: &str,
     startup_cwd: &Path,
@@ -501,7 +508,7 @@ mod tests {
 }
 
 pub(crate) fn print_proxy_links(host: &str, port: u16, config: &ProxyConfig) {
-    info!(target: "telemt::links", "--- Proxy Links ({}) ---", host);
+    print_maestro_line(format!("Proxy links ({host})"));
     for user_name in config
         .general
         .links
@@ -509,20 +516,16 @@ pub(crate) fn print_proxy_links(host: &str, port: u16, config: &ProxyConfig) {
         .resolve_users(&config.access.users)
     {
         if let Some(secret) = config.access.users.get(user_name) {
-            info!(target: "telemt::links", "User: {}", user_name);
+            print_maestro_line(format!("User: {user_name}"));
             if config.general.modes.classic {
-                info!(
-                    target: "telemt::links",
-                    "  Classic: tg://proxy?server={}&port={}&secret={}",
-                    host, port, secret
-                );
+                print_maestro_line(format!(
+                    "Classic: tg://proxy?server={host}&port={port}&secret={secret}"
+                ));
             }
             if config.general.modes.secure {
-                info!(
-                    target: "telemt::links",
-                    "  DD:      tg://proxy?server={}&port={}&secret=dd{}",
-                    host, port, secret
-                );
+                print_maestro_line(format!(
+                    "DD: tg://proxy?server={host}&port={port}&secret=dd{secret}"
+                ));
             }
             if config.general.modes.tls {
                 let mut domains = Vec::with_capacity(1 + config.censorship.tls_domains.len());
@@ -535,18 +538,15 @@ pub(crate) fn print_proxy_links(host: &str, port: u16, config: &ProxyConfig) {
 
                 for domain in domains {
                     let domain_hex = hex::encode(&domain);
-                    info!(
-                        target: "telemt::links",
-                        "  EE-TLS:  tg://proxy?server={}&port={}&secret=ee{}{}",
-                        host, port, secret, domain_hex
-                    );
+                    print_maestro_line(format!(
+                        "EE-TLS: tg://proxy?server={host}&port={port}&secret=ee{secret}{domain_hex}"
+                    ));
                 }
             }
         } else {
             warn!(target: "telemt::links", "User '{}' in show_link not found", user_name);
         }
     }
-    info!(target: "telemt::links", "------------------------");
 }
 
 pub(crate) async fn write_beobachten_snapshot(path: &str, payload: &str) -> std::io::Result<()> {
